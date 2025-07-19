@@ -1,0 +1,118 @@
+---
+title: "Mid-Semester Check In 2"
+output: html_document
+date: "2025-07-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Libraries
+```{r}
+#Always good to get all the packages up and running before doing anything else
+library(data.table) 
+library(ggplot2)
+library(tidyverse)
+```
+
+## Load metadata and gene expression data and created a combined data frame.
+```{r}
+filename <- "/Users/nupoormarwah/Downloads/QBS103_GSE157103_series_matrix-1.csv"
+meta_data <- fread(filename)
+
+filename <- "/Users/nupoormarwah/Downloads/QBS103_GSE157103_genes.csv"
+
+#Makes so that V1 col that contains the gene names are now the row names
+gene_expr <- fread(filename) %>%
+  column_to_rownames("V1") %>%
+ #Transposing with make the table be 126 observations by 100 observations
+  t() %>%
+  data.frame()
+
+#Create combined data frame. Now we have one single data frame with all the data
+comb_df <- cbind(meta_data, gene_expr)
+```
+
+
+#Started making plots
+```{r}
+#Created a function with four parameters. The first one was df, second genes, etc. The df was for data frame, second was for the actual gene list, continuous_cov was for the numeric covariate Charlson score, and cat_cov was for our categorical covariates sex and disease status. 
+create_gene_plots <- function(df, genes, continuous_cov, cat_cov){
+  #Having strings passed into ggplot causes an error. We can use "!!sym()" to refer to a column when its name is stored as a string. !! unquotes the symbol. We used lapply to create a loop that let me create plots for each gene. 
+  hist_plots <- lapply(genes, function(gene){
+    ggplot(data = df, mapping = aes(x = !!sym(gene))) + 
+    geom_histogram(fill = "purple", col = "black") +
+    #Paste helps combine strings
+    labs(x = paste(gene, "Expression"), y = "Count", title = paste("Histogram of", gene, "Gene Expression")) +
+    theme_bw() +
+    theme(
+       plot.title = element_text(face = "bold", hjust = 0.50)
+    ) 
+  })
+  
+  #Scatterplots
+  #"str_to_title" used to capitalize the first letter of each word. "gsub" used to substitute spaces for underscores. 
+  cont_cov_label <- str_to_title(gsub("_", " ", continuous_cov))
+  #Similar to the histogram, used lapply to creare a loop that let me create plots for each gene.
+  scatter_plots <- lapply(genes, function(gene){
+    ggplot(data = df, mapping = aes(x = !!sym(gene), y = !!sym(continuous_cov))) + 
+    geom_point(color = "blue", size = 2) +
+    labs(
+     x = paste(gene, "Expression"), y = cont_cov_label, 
+     title = paste("Scatterplot of", cont_cov_label, "vs", gene, "Expression")
+    ) +
+    theme_bw() +
+    theme(
+     plot.title = element_text(face = "bold", hjust = 0.50)
+    )
+  })
+  
+  
+  #Boxplots
+  #Again used "str_to_title" and "gsub" to clean up the title names for sex and disease status. 
+  cat_cov_label1 <- str_to_title(gsub("_", " ", cat_cov[1]))
+  cat_cov_label2 <- str_to_title(gsub("_", " ", cat_cov[2]))
+  box_plots <- lapply(genes, function(gene){
+    ggplot(data = df, mapping = aes(x = !!sym(cat_cov[1]), y = !!sym(gene), fill = !!sym(cat_cov[1]))) + 
+    geom_boxplot() +
+    #Had to replace the ~ with the vars function for the faceting to work. 
+      facet_wrap(vars(!!sym(cat_cov[2]))) +
+    labs(
+      x = cat_cov_label1, y = paste(gene, "Expression"), 
+      title = paste("Boxplot of", gene, "Expression by", cat_cov_label1, "and", cat_cov_label2), 
+      fill = cat_cov_label1
+      ) +
+    theme_bw() +
+    theme(
+       plot.title = element_text(face = "bold", hjust = 0.50)
+    )
+  })
+  
+  
+  #Created a list of things to return. 
+  return(list(
+    "Histograms" = hist_plots, "Scatterplots" = scatter_plots, "Boxplots" = box_plots
+  ))
+}
+#Doing it this way will update the title, axis, and gene that was plotted. Assigned the output of our function ot a variable named res1. You should see res1 in our environment. If you print res1, you'll get all the plots.
+res1 <- create_gene_plots(
+  df = comb_df, genes = c("A2M", "AASDHPPT", "AAAS"), 
+  continuous_cov = "charlson_score",
+  cat_cov = c("sex", "disease_status")
+)
+
+#Printing histograms, scatterplots, and boxplots separately. 
+res1[["Histograms"]]
+```
+
+```{r}
+res1[["Scatterplots"]]
+```
+
+
+```{r}
+res1[["Boxplots"]]
+```
+
+
